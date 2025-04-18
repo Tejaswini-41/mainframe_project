@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from db2_connector import DB2Connector
+# Update imports
+from table_operations import create_table_interface, insert_data_interface
+from schema_operations import create_schema_interface
+
 
 # Add caching to improve performance
 @st.cache_data(ttl=300)
@@ -19,6 +23,7 @@ def get_tables(_connector, schema):
     if not tables_df.empty and 'TABNAME' in tables_df.columns:
         return tables_df['TABNAME'].tolist()
     return []
+
 
 def connection_page():
     """Connection page UI"""
@@ -104,6 +109,9 @@ def main_interface():
     # Initialize query_result if not exists
     if 'query_result' not in st.session_state:
         st.session_state.query_result = None
+
+    if 'ui_mode' not in st.session_state:
+        st.session_state.ui_mode = "default"
     
     # Header with logout button
     col1, col2 = st.columns([6, 1])
@@ -123,6 +131,11 @@ def main_interface():
     with st.sidebar:
         st.subheader("Database Explorer")
         
+        # Add Create Schema button above Select Schema
+        if st.button("Create Schema", key="create_schema_button"):
+            st.session_state.ui_mode = "create_schema"
+            st.rerun()
+        
         # Get schemas using cached function
         schemas = get_schemas(_connector)
         
@@ -136,14 +149,18 @@ def main_interface():
             if selected_schema:
                 st.subheader(f"Schema: {selected_schema}")
                 action = st.radio("Schema Actions", 
-                                  ["View Schema", "Create Schema", "Drop Schema"],
+                                  ["View Schema", "Create Table", "Drop Schema"],
                                   key="schema_action")
                 
                 if st.button("Execute Action", key="execute_schema_action"):
                     if action == "View Schema":
+                        st.session_state.ui_mode ="default"
                         view_schema_details(selected_schema)
-                    elif action == "Create Schema":
-                        create_table(selected_schema)
+                    elif action == "Create Table":
+                        # Just set the UI mode and schema, don't render the interface here
+                        st.session_state.current_schema_for_table = selected_schema
+                        st.session_state.ui_mode = "create_table"
+                        st.rerun()
                     elif action == "Drop Schema":
                         drop_schema(selected_schema)
             
@@ -155,7 +172,7 @@ def main_interface():
                     
                     if selected_table:
                         table_action = st.radio("Table Actions", 
-                                              ["View Data", "View Structure", "Drop Table", "Truncate Table"],
+                                              ["View Data", "View Structure", "Insert Data", "Drop Table", "Truncate Table"],
                                               key="table_action")
                         
                         if st.button("Execute Action", key="execute_table_action"):
@@ -163,6 +180,8 @@ def main_interface():
                                 view_table_data(selected_schema, selected_table)
                             elif table_action == "View Structure":
                                 view_table_structure(selected_schema, selected_table)
+                            elif table_action == "Insert Data":
+                                insert_data(selected_schema, selected_table)
                             elif table_action == "Drop Table":
                                 drop_table(selected_schema, selected_table)
                             elif table_action == "Truncate Table":
@@ -171,56 +190,159 @@ def main_interface():
                     st.info(f"No tables found in schema {selected_schema}")
     
     # Main content area with SQL editor and results
-    st.subheader("SQL Editor")
-    
-    # SQL query input
-    query = st.text_area(
-        "Enter SQL Query",
-        height=150,
-        placeholder="SELECT * FROM SCHEMA.TABLE WHERE condition", 
-        key="sql_query"
-    )
-    
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        if st.button("Execute", use_container_width=True):
-            execute_query(query)
-    
-    # Display query results or selected content
-    st.subheader("Results")
-    
-    if st.session_state.query_result is not None:
-        result, message = st.session_state.query_result
+    if st.session_state.ui_mode == "create_schema":
+        # If we're in schema creation mode, handle it in the main content area
+        result, message = create_schema_interface()
         
         if result is not None:
-            if isinstance(result, pd.DataFrame):
-                st.success(message)
+            # Schema was successfully created
+            st.session_state.query_result = (result, message)
+            # Reset UI mode
+            st.session_state.ui_mode = "default"
+            # Show success message
+            st.success(message)
+        elif message:
+            if "Permission denied" in message or "SQL0552N" in message:
+                st.error(message)
+                st.info("""
+                **Troubleshooting Permission Issues:**
                 
-                # Add download button for query results
-                if not result.empty:
-                    csv = result.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "Download Results as CSV",
-                        csv,
-                        "query_results.csv",
-                        "text/csv",
-                        key="download_query_results"
-                    )
+                To create schemas in DB2, you need:
+                - SYSADM authority, or
+                - SYSCTRL authority, or
+                - DBADM authority
                 
-                # Show result data - limit for performance
-                if len(result) > 1000:
-                    st.dataframe(result.head(1000), use_container_width=True)
-                    st.warning(f"Showing first 1,000 rows of {len(result)} total rows")
-                else:
-                    st.dataframe(result, use_container_width=True)
-                
-                st.info(f"Query returned {len(result)} rows")
+                Connect with a user that has one of these privileges or ask your DB administrator to grant them.
+                """)
             else:
-                st.success(message)
-        else:
+                st.error(message)
+        
+        # Add a button to cancel and go back
+        if st.button("Cancel Schema Creation"):
+            st.session_state.ui_mode = "default"
+            st.rerun()
+            
+    elif st.session_state.ui_mode == "create_table":
+        # If we're in table creation mode, handle it directly in the main content area
+        schema = st.session_state.current_schema_for_table
+        result, message = create_table_interface(schema)
+        
+        if result is not None:
+            # Table was successfully created
+            st.session_state.query_result = (result, message)
+            # Reset UI mode
+            st.session_state.ui_mode = "default"
+            # Show success message
+            st.success(f"Table created successfully in schema {schema}")
+        elif message:
             st.error(message)
+        
+        # Add a button to cancel and go back
+        if st.button("Cancel Table Creation"):
+            st.session_state.ui_mode = "default"
+            st.rerun()
+    
+    elif st.session_state.ui_mode == "drop_table":
+        # Handle drop table confirmation in the main area
+        schema = st.session_state.drop_table_info['schema']
+        table = st.session_state.drop_table_info['table']
+        
+        st.subheader(f"Drop Table: {schema}.{table}")
+        st.warning("⚠️ WARNING: This action cannot be undone!")
+        st.markdown(f"You are about to drop table **{schema}.{table}** and all its data will be permanently deleted.")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Confirm Drop Table", type="primary", key="confirm_drop_table"):
+                with st.spinner(f"Dropping table {schema}.{table}..."):
+                    drop_query = f'DROP TABLE "{schema}"."{table}"'
+                    result, message = _connector.execute_query(drop_query)
+                    
+                    if result is not None:
+                        # Clear table cache to reflect changes
+                        get_tables.clear()
+                        st.session_state.query_result = (None, f"Table {schema}.{table} dropped successfully")
+                        st.session_state.ui_mode = "default"
+                        st.rerun()
+                    else:
+                        st.session_state.query_result = (None, f"Error dropping table: {message}")
+                        
+        with col2:
+            if st.button("Cancel", key="cancel_drop_table", use_container_width=True):
+                st.session_state.ui_mode = "default"
+                st.rerun()
+    
+    elif st.session_state.ui_mode == "insert_data":
+        # Handle insert data in the main area
+        schema = st.session_state.insert_table_info['schema']
+        table = st.session_state.insert_table_info['table']
+        
+        result, message = insert_data_interface(schema, table)
+        
+        if result is not None:
+            # Data was inserted successfully
+            st.session_state.query_result = (result, message)
+            # We don't reset UI mode here to allow multiple inserts
+            st.success(message)
+        elif message:
+            st.error(message)
+        
+        # Add a button to finish inserting
+        if st.button("Done", key="finish_insert_data"):
+            st.session_state.ui_mode = "default"
+            st.rerun()
+    
     else:
-        st.info("Execute a query or select an item from the sidebar to see results here")
+        st.subheader("SQL Editor")
+        
+        # SQL query input
+        query = st.text_area(
+            "Enter SQL Query",
+            height=150,
+            placeholder="SELECT * FROM SCHEMA.TABLE WHERE condition", 
+            key="sql_query"
+        )
+        
+        col1, col2 = st.columns([1, 6])
+        with col1:
+            if st.button("Execute", use_container_width=True):
+                execute_query(query)
+        
+        # Display query results or selected content
+        st.subheader("Results")
+        
+        if st.session_state.query_result is not None:
+            result, message = st.session_state.query_result
+            
+            if result is not None:
+                if isinstance(result, pd.DataFrame):
+                    st.success(message)
+                    
+                    # Add download button for query results
+                    if not result.empty:
+                        csv = result.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            "Download Results as CSV",
+                            csv,
+                            "query_results.csv",
+                            "text/csv",
+                            key="download_query_results"
+                        )
+                    
+                    # Show result data - limit for performance
+                    if len(result) > 1000:
+                        st.dataframe(result.head(1000), use_container_width=True)
+                        st.warning(f"Showing first 1,000 rows of {len(result)} total rows")
+                    else:
+                        st.dataframe(result, use_container_width=True)
+                    
+                    st.info(f"Query returned {len(result)} rows")
+                else:
+                    st.success(message)
+            else:
+                st.error(message)
+        else:
+            st.info("Execute a query or select an item from the sidebar to see results here")
 
 def execute_query(query):
     """Execute SQL query and store result in session state"""
@@ -259,7 +381,10 @@ def view_schema_details(schema):
 
 def create_table(schema):
     """Create table in schema"""
-    st.session_state.message = f"Create table in {schema} (Not implemented yet)"
+    # This function should only set up the state for the table creation UI
+    st.session_state.current_schema_for_table = schema
+    st.session_state.ui_mode = "create_table"
+    st.rerun()  # Force a rerun to show the table creation UI in the main area
 
 def drop_schema(schema):
     """Drop schema"""
@@ -286,9 +411,33 @@ def view_table_structure(schema, table):
         result = _connector.get_columns(schema, table)
         st.session_state.query_result = (result, f"Structure of {schema}.{table}")
 
+def insert_data(schema, table):
+    """Set up for inserting data into a table"""
+    _connector = st.session_state.db2_connector
+    if not _connector:
+        return
+    
+    # Set UI mode for data insertion
+    st.session_state.ui_mode = "insert_data"
+    st.session_state.insert_table_info = {
+        'schema': schema,
+        'table': table,
+    }
+    st.rerun()
+
 def drop_table(schema, table):
-    """Drop table"""
-    st.session_state.message = f"Drop table {schema}.{table} (Not implemented yet)"
+    """Drop table with confirmation"""
+    _connector = st.session_state.db2_connector
+    if not _connector:
+        return
+    
+    # Set UI mode for drop table confirmation
+    st.session_state.ui_mode = "drop_table"
+    st.session_state.drop_table_info = {
+        'schema': schema,
+        'table': table,
+    }
+    st.rerun()
 
 def truncate_table(schema, table):
     """Truncate table"""
