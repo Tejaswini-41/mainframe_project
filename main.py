@@ -1,5 +1,5 @@
 """
-DB2 Web Manager - A web-based management tool for IBM DB2 databases
+DB2 Explorer - A web-based management tool for IBM DB2 databases
 
 This script runs the Streamlit application. You can run it directly or use 'app.py' as an alternative entry point.
 """
@@ -19,7 +19,7 @@ def check_requirements():
     ]
     
     # Check for IBM DB2 client driver
-    if not os.path.exists('C:\\Program Files\\IBM\\clidriver\\bin'):
+    if not os.path.exists('clidriver\\bin'):
         st.error("""
         IBM DB2 client driver not found!
         

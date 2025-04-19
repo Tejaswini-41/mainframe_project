@@ -1,32 +1,73 @@
 import streamlit as st
 import pandas as pd
 from db2_connector import DB2Connector
+import time
 
 def create_schema_interface():
     """Interface for creating a new schema in the database"""
-    st.subheader("Create New Schema")
+    # Schema name input with improved styling
+    schema_name = st.text_input(
+        "Schema Name", 
+        key="new_schema_name",
+        placeholder="Enter schema name (e.g., MYSCHEMA)",
+        help="Schema name must start with a letter and can contain letters, numbers, and underscores"
+    ).strip().upper()
     
-    # Schema name input
-    schema_name = st.text_input("Schema Name", key="new_schema_name").strip().upper()
+    # Validation with better UI
+    is_valid = True
+    validation_message = ""
     
-    # Check if schema name is valid
-    if schema_name and not schema_name[0].isalpha():
-        st.warning("Schema name must start with a letter")
-        return None, "Schema name must start with a letter"
+    if schema_name:
+        if not schema_name[0].isalpha():
+            is_valid = False
+            validation_message = "Schema name must start with a letter"
+        elif len(schema_name) > 30:
+            is_valid = False
+            validation_message = "Schema name must be 30 characters or less"
+        elif not all(c.isalnum() or c == '_' for c in schema_name):
+            is_valid = False
+            validation_message = "Schema name can only contain letters, numbers, and underscores"
     
-    # Create schema button
-    create_disabled = not schema_name
-    if st.button("Create Schema", type="primary", disabled=create_disabled):
-        return execute_create_schema(schema_name)
+    if not is_valid and validation_message:
+        st.warning(validation_message)
     
-    # Permission information 
+    # Description field (optional)
+    schema_description = st.text_area(
+        "Description (Optional)",
+        placeholder="Add a description for this schema",
+        key="schema_description"
+    )
+    
+    # Options and settings
+    with st.expander("Advanced Options", expanded=False):
+        st.info("No additional options available for schema creation in DB2")
+    
+    # Create schema button with improved styling
+    create_disabled = not schema_name or not is_valid
+    
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("Create Schema", type="primary", disabled=create_disabled):
+            with st.spinner(f"Creating schema {schema_name}..."):
+                # Add slight delay for animation
+                time.sleep(0.5)
+                return execute_create_schema(schema_name)
+    
+    # Permission information with improved styling
     st.markdown("---")
-    st.info("""
-    **Note:** Creating a schema requires elevated database privileges. 
-    Your user account must have SYSADM, SYSCTRL, or DBADM authority to create schemas.
-    
-    If you don't have these privileges, please contact your database administrator.
-    """)
+    st.markdown("""
+    <div style="background:#f0f9ff; border-radius:6px; padding:1rem; border:1px solid #e0f2fe;">
+        <h3 style="margin-top:0; font-size:1rem; font-weight:600;">Permission Requirements</h3>
+        <p style="font-size:0.9rem;">Creating a schema requires elevated database privileges. 
+        Your user account must have one of the following authorities:</p>
+        <ul style="font-size:0.9rem;">
+            <li><strong>SYSADM</strong> - System Administrator</li>
+            <li><strong>SYSCTRL</strong> - System Control</li>
+            <li><strong>DBADM</strong> - Database Administrator</li>
+        </ul>
+        <p style="font-size:0.9rem;">If you don't have these privileges, please contact your database administrator.</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     return None, None
 
@@ -76,8 +117,20 @@ To resolve this:
 def handle_schema_error(error_message):
     """Parse DB2 error messages and return user-friendly guidance"""
     if "SQL0552N" in error_message:
-        return "Permission denied: Your user doesn't have the required privileges to perform this operation."
+        return {
+            "title": "Permission Denied",
+            "message": "Your user doesn't have the required privileges to perform this operation.",
+            "guidance": "Ask your database administrator to grant the necessary privileges to your user account."
+        }
     elif "SQL0601N" in error_message:
-        return "Schema name already exists. Please choose a different name."
+        return {
+            "title": "Schema Already Exists",
+            "message": "A schema with this name already exists in the database.",
+            "guidance": "Choose a different schema name or use the existing schema."
+        }
     else:
-        return error_message
+        return {
+            "title": "Database Error",
+            "message": error_message,
+            "guidance": "Check the syntax and permissions for this operation."
+        }

@@ -1,17 +1,20 @@
-# DB2 Web Manager
+# DB2 Explorer
 
-A web-based management tool for IBM DB2 databases, similar to pgAdmin but specialized for DB2. This application allows you to connect to a DB2 instance, browse schemas and tables, view and manipulate data, and execute custom SQL queries through a user-friendly web interface.
+A professional web-based management tool for IBM DB2 databases, similar to pgAdmin but specialized for DB2. This application allows you to connect to a DB2 instance, browse schemas and tables, view and manipulate data, and execute custom SQL queries through an intuitive, modern interface.
 
-![DB2 Web Manager](https://via.placeholder.com/800x450?text=DB2+Web+Manager)
+![DB2 Explorer](https://via.placeholder.com/800x450?text=DB2+Explorer+Professional+Interface)
 
 ## Features
 
-- **Connection management**: Connect to any DB2 instance with connection profiles
-- **Database overview**: View database and server information
-- **Schema explorer**: Browse all schemas and tables in the database
-- **Table viewer**: Examine table structure and data with pagination
+- **Modern UI**: Clean, professional interface with animations and intuitive navigation
+- **Connection management**: Connect to any DB2 instance with saved connection profiles
+- **Database overview**: View database and server information with visual metrics
+- **Schema explorer**: Browse, create, and manage schemas in the database
+- **Table management**: Create tables with custom columns, primary keys, and constraints
+- **Data operations**: View table structure, insert data, and manage records
 - **SQL executor**: Execute custom SQL queries with results as downloadable CSV
-- **Visualization**: Charts and statistics about your database structure
+- **Optimized performance**: Cached schema and table loading for faster navigation
+- **Responsive design**: Works on desktop, tablet, and mobile devices
 
 ## Prerequisites
 
@@ -35,67 +38,60 @@ git clone <repository-url>
 cd mainframe_project
 ```
 
-### 3. Set up a Python virtual environment (recommended)
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-### 4. Install the required packages
+### 3. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Or install the packages individually:
+### 4. Run the application
 
 ```bash
-pip install streamlit pandas plotly ibm_db ibm_db_dbi
+streamlit run main.py
 ```
 
-## Usage
+## Usage Guide
 
-### Running the application
+### Connecting to DB2
 
-```bash
-streamlit run app.py
+1. Launch the application and use the connection form
+2. Enter your DB2 server details and credentials
+3. Save commonly used connections as profiles
+
+### Managing Schemas
+
+- Create new schemas (requires admin privileges)
+- Browse existing schemas
+- View schema details and tables within
+
+### Working with Tables
+
+- Create tables with custom column definitions
+- View table structure and data
+- Insert, update, and delete data
+- Execute operations like truncate and drop
+
+### Executing SQL
+
+- Use the built-in SQL editor to write and execute queries
+- View results in a paginated data table
+- Download results in CSV format
+
+## Development
+
+### Project Structure
+
 ```
-
-Alternatively, you can use:
-
-```bash
-python main.py
+mainframe_project/
+├── app.py               # Main Streamlit application
+├── main.py              # Entry point 
+├── db2_connector.py     # DB2 database connection handler
+├── ui_components.py     # UI components and interfaces
+├── table_operations.py  # Table management functionality
+├── schema_operations.py # Schema management functionality
+└── requirements.txt     # Project dependencies
 ```
-
-### Connection Settings
-
-When you start the application, you will need to provide the following information to connect to your DB2 database:
-
-- **Hostname**: The hostname or IP address of your DB2 server (default: localhost)
-- **Port**: The port number for the DB2 server (default: 25000)
-- **Database**: The name of the database to connect to
-- **Username**: Your DB2 username
-- **Password**: Your DB2 password
-
-You can save these settings as a connection profile for future use.
-
-## Application Structure
-
-- `app.py`: Main Streamlit application entry point
-- `main.py`: Alternative entry point with dependency checking
-- `db2_connector.py`: DB2 database connection and operations
-- `ui_components.py`: Streamlit UI components
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- IBM for DB2 database and drivers
-- Streamlit for the web interface framework
