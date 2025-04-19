@@ -2,7 +2,14 @@ import os
 import pandas as pd
 
 # Add DB2 client driver directory to path
-os.add_dll_directory('C:\\Program Files\\IBM\\clidriver\\bin')
+import os.path
+
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+clidriver_path = os.path.join(current_dir, 'clidriver', 'bin')
+
+
+os.add_dll_directory(clidriver_path)
 import ibm_db
 import ibm_db_dbi
 
