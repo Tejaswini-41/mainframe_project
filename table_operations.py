@@ -281,47 +281,26 @@ def insert_data_interface(schema, table):
         # Column state for this form
         form_data = {}
         
-        # Group columns by type for better organization
-        col_types = {
-            "Text": ["CHAR", "VARCHAR", "CLOB"],
-            "Numeric": ["INTEGER", "SMALLINT", "BIGINT", "DECIMAL", "FLOAT", "DOUBLE"],
-            "Date/Time": ["DATE", "TIME", "TIMESTAMP"],
-            "Other": ["BLOB"]
-        }
+        # Display all columns in one page - no tabs or grouping
+        st.markdown("""
+        <div style="background:#f8f9fa; border-radius:6px; padding:0.75rem; margin-bottom:1rem; border-left:3px solid #3b71ca;">
+            <h3 style="margin-top:0; font-weight:600; font-size:1rem;">Column Values</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Organize columns by type
-        cols_by_type = {k: [] for k in col_types}
-        for _, row in columns_df.iterrows():
-            col_name = row['COLNAME']
-            col_type = row['TYPENAME']
-            
-            # Determine which group this column belongs to
-            group = "Other"
-            for type_group, types in col_types.items():
-                if any(t in col_type for t in types):
-                    group = type_group
-                    break
-                    
-            cols_by_type[group].append(row)
-        
-        # Remove empty groups
-        cols_by_type = {k: v for k, v in cols_by_type.items() if v}
-        
-        # Create tabs for column groups if there are multiple groups
-        if len(cols_by_type) > 1:
-            tabs = st.tabs(list(cols_by_type.keys()))
-            
-            for i, (group, columns) in enumerate(cols_by_type.items()):
-                with tabs[i]:
-                    _create_input_fields(columns, form_data, schema, table)
-        else:
-            # Just show all columns if there's only one group
-            _create_input_fields(columns_df.iterrows(), form_data, schema, table)
+        # Get all columns as a list for the input fields
+        all_columns = columns_df.to_dict('records')
+        _create_input_fields(all_columns, form_data, schema, table)
         
         # Submit button with better styling
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            submitted = st.form_submit_button("Insert Row", type="primary", use_container_width=True)
+        st.markdown("""
+        <div style="background:#f0f9ff; border-radius:6px; padding:0.75rem; margin:1rem 0; border-left:3px solid #3b71ca;">
+            <p style="margin:0; font-weight:500;">Click the button below to insert data</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Full width submit button for better visibility
+        submitted = st.form_submit_button("Insert Data", type="primary", use_container_width=True)
         
     if submitted:
         with st.spinner("Inserting data..."):
@@ -332,10 +311,20 @@ def insert_data_interface(schema, table):
 
 def _create_input_fields(columns, form_data, schema, table):
     """Helper function to create input fields based on column types"""
-    for _, row in columns:
-        col_name = row['COLNAME']
-        col_type = row['TYPENAME']
-        nullable = row['NULLS'] == 'Y'
+    # Update function to handle both DataFrame rows and dictionaries
+    for row in columns:
+        # Check if row is a tuple from iterrows() or a dict
+        if isinstance(row, tuple):
+            # It's from iterrows(), so get the second item (the Series)
+            _, row_data = row
+        else:
+            # It's already a dict or Series
+            row_data = row
+        
+        # Extract values using dictionary-like access
+        col_name = row_data['COLNAME']
+        col_type = row_data['TYPENAME']
+        nullable = row_data['NULLS'] == 'Y'
         
         st.markdown(f"""
         <div style="padding:0.5rem 0; border-bottom:1px solid #f3f4f6;">
